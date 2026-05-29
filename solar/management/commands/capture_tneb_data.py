@@ -57,6 +57,17 @@ class Command(BaseCommand):
 
         SUBSTATION_ID = "2387"
 
+        # ---------------------------------------------------
+        # CLEANUP LEGACY CHECK DATA
+        # ---------------------------------------------------
+        self.stdout.write("Cleaning up any legacy CHECK feeder data from database...")
+        try:
+            raw_deleted, _ = FeederDataRaw.objects.filter(feeder_name__icontains='check').delete()
+            main_deleted, _ = MainFeederData.objects.filter(feeder_name__icontains='check').delete()
+            self.stdout.write(f"Removed {raw_deleted} legacy rows from FeederDataRaw and {main_deleted} legacy rows from MainFeederData.")
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"Error during legacy cleanup: {e}"))
+
         while True:
             self.stdout.write("Starting live data capture cycle...")
             try:
@@ -258,11 +269,15 @@ class Command(BaseCommand):
                     if len(cols) < 35:
                         continue
 
+                    feeder_name = cols[4]
+                    if "check" in feeder_name.lower():
+                        continue
+
                     rows.append({
                         "Station": cols[0],
                         "SSID": cols[1],
                         "Voltage": cols[2],
-                        "Feeder Name": cols[4],
+                        "Feeder Name": feeder_name,
                         "Meter No": cols[7],
                         "MW": cols[20],
                         "MVAr": cols[21],
