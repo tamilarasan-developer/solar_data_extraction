@@ -5,6 +5,13 @@ class FeederDataRaw(models.Model):
 
     station = models.CharField(max_length=255)
     round_off_time = models.DateTimeField()
+
+    # NEW COLUMN
+    script_run_time = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
     ssid = models.CharField(max_length=50)
     voltage = models.CharField(max_length=50)
 
@@ -81,8 +88,6 @@ class FeederDataRaw(models.Model):
         return self.feeder_name
 
 
-
-
 class MainFeederData(models.Model):
 
     station = models.CharField(max_length=255)
@@ -100,10 +105,6 @@ class MainFeederData(models.Model):
     avg_net_mw = models.DecimalField(
         max_digits=15,
         decimal_places=4,
-        default=0
-    )
-
-    sample_count = models.IntegerField(
         default=0
     )
 
