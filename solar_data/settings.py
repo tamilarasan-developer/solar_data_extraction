@@ -80,23 +80,23 @@ WSGI_APPLICATION = 'solar_data.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': os.getenv("DB_NAME", "demand_db"),
-#         'USER': os.getenv("DB_USER", "postgres"),
-#         'PASSWORD': os.getenv("DB_PASSWORD", "LGEcbe@26"),
-#         'HOST': os.getenv("DB_HOST", "172.16.7.116"),
-#         'PORT': os.getenv("DB_PORT", "5432"),
-#     }
-# }
-
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv("DB_NAME", "demand_db"),
+        'USER': os.getenv("DB_USER", "postgres"),
+        'PASSWORD': os.getenv("DB_PASSWORD", "LGEcbe@26"),
+        'HOST': os.getenv("DB_HOST", "172.16.7.116"),
+        'PORT': os.getenv("DB_PORT", "5432"),
     }
 }
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+#     }
+# }
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -127,6 +127,9 @@ TIME_ZONE = 'Asia/Kolkata'
 USE_I18N = True
 
 USE_TZ = False
+
+DATETIME_FORMAT = 'Y-m-d h:i:s A'
+SHORT_DATETIME_FORMAT = 'Y-m-d h:i:s A'
 
 
 # Static files (CSS, JavaScript, Images)

@@ -191,10 +191,11 @@ def calculate_15min_averages():
     else:
         time_threshold = current_round_off - timedelta(minutes=15)
 
+    time_threshold_str = time_threshold.strftime('%Y-%m-%d %I:%M:%S %p')
+
     # ONLY SOLAR! IGNORE CHECK! IGNORE WIND!
     averages = FeederDataRaw.objects.filter(
-        round_off_time__gte=time_threshold,
-        round_off_time__lt=current_round_off,
+        round_off_time=time_threshold_str,
         feeder_name__icontains="SOLAR"  
     ).exclude(
         feeder_name__icontains="CHECK"  
@@ -223,7 +224,8 @@ def calculate_15min_averages():
             }
         )
         updated_count += 1
-        print(f"      * {data['feeder_name']:<40} | Export: {data['calculated_export_mw']:.4f} | Net: {data['calculated_net_mw']:.4f}")
+        round_off_str = data['round_off_time']
+        print(f"      * {data['feeder_name']:<40} | Time: {round_off_str} | Export: {data['calculated_export_mw']:.4f} | Net: {data['calculated_net_mw']:.4f}")
         
     if updated_count > 0:
         print(f"   -> [Success] Stored {updated_count} strictly SOLAR records in MainFeederData.")
@@ -241,9 +243,9 @@ while True:
         current_run_time = datetime.now(IST_TZ)
         if not settings.USE_TZ:
             current_run_time = current_run_time.replace(tzinfo=None)
-            print_time_str = current_run_time.strftime('%Y-%m-%d %H:%M:%S') + ' IST'
+            print_time_str = current_run_time.strftime('%Y-%m-%d %I:%M:%S %p') + ' IST'
         else:
-            print_time_str = current_run_time.strftime('%Y-%m-%d %H:%M:%S %Z')
+            print_time_str = current_run_time.strftime('%Y-%m-%d %I:%M:%S %p %Z')
         
         print(f"\n=======================================================")
         print(f"🚀 SCRIPT RUN TRIGGERED AT: {print_time_str}")
@@ -268,6 +270,11 @@ while True:
         
         db_instances = []
         
+        if settings.USE_TZ:
+            stale_threshold = timezone.now() - timedelta(minutes=45)
+        else:
+            stale_threshold = datetime.now() - timedelta(minutes=45)
+
         for row in rows:
             feeder_name = row["Feeder Name"][:255]
             station_val = row["Station"][:255]
@@ -285,7 +292,20 @@ while True:
             comm_val = row["Communication"][:100]
             rtc_val = row["RTC Time"][:100]
 
+            try:
+                dt_obj = datetime.strptime(rtc_val.strip(), "%d/%m/%Y %H:%M:%S")
+                rtc_time_formatted = dt_obj.strftime("%d/%m/%Y %I:%M:%S %p")
+            except Exception:
+                rtc_time_formatted = rtc_val
+
             calculated_round_off = parse_and_round_rtc_time(rtc_val)
+
+            # Warn if stale
+            name_up = feeder_name.upper()
+            if "SOLAR" in name_up and "CHECK" not in name_up and "WIND" not in name_up:
+                if calculated_round_off < stale_threshold:
+                    old_date_str = calculated_round_off.strftime("%b %d, %I:%M:%S %p")
+                    print(f"   -> [Warning] {feeder_name} is sending old data ({old_date_str}) and was excluded from the average.")
 
             db_instances.append(
                 FeederDataRaw(
@@ -303,10 +323,10 @@ while True:
                     net_mw=net_mw_val,
                     direction=direction_val,
                     communication=comm_val,
-                    rtc_time=rtc_val,
+                    rtc_time=rtc_time_formatted,
                     
-                    script_run_time=current_run_time, 
-                    round_off_time=calculated_round_off 
+                    script_run_time=current_run_time.strftime('%Y-%m-%d %I:%M:%S %p'), 
+                    round_off_time=calculated_round_off.strftime('%Y-%m-%d %I:%M:%S %p')
                 )
             )
 
@@ -314,19 +334,6 @@ while True:
             # Step 1: Save EVERYTHING to raw table
             FeederDataRaw.objects.bulk_create(db_instances)
             print(f"   -> [Status] Stored {len(db_instances)} raw rows to the DB (FeederDataRaw).")
-            
-            # DEAD METER WARNING LOGIC 
-            if settings.USE_TZ:
-                stale_threshold = timezone.now() - timedelta(minutes=45)
-            else:
-                stale_threshold = datetime.now() - timedelta(minutes=45)
-
-            for inst in db_instances:
-                name_up = inst.feeder_name.upper()
-                if "SOLAR" in name_up and "CHECK" not in name_up and "WIND" not in name_up:
-                    if inst.round_off_time < stale_threshold:
-                        old_date_str = inst.round_off_time.strftime("%b %d")
-                        print(f"   -> [Warning] {inst.feeder_name} is sending old data ({old_date_str}) and was excluded from the average.")
             
             # Count the runs to show 1 to 5 progress
             sample_feeder = db_instances[0].feeder_name
