@@ -83,7 +83,7 @@ WSGI_APPLICATION = 'solar_data.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv("DB_NAME", "demand_db"),
+        'NAME': os.getenv("DB_NAME", "solar_data"),
         'USER': os.getenv("DB_USER", "postgres"),
         'PASSWORD': os.getenv("DB_PASSWORD", "LGEcbe@26"),
         'HOST': os.getenv("DB_HOST", "172.16.7.116"),

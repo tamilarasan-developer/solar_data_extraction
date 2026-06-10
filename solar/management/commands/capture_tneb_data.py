@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 # ---------------------------------------------------------
 # 1. DJANGO SETUP
 # ---------------------------------------------------------
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'solar.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'solar_data.settings')
 django.setup()
 
 from solar.models import FeederDataRaw, MainFeederData
@@ -42,33 +42,21 @@ def safe_decimal(val):
 def round_to_nearest_15_mins(dt_obj):
     minute = dt_obj.minute
     remainder = minute % 15
-
-    if remainder >= 8:
-        rounded_minute = minute + (15 - remainder)
-    else:
-        rounded_minute = minute - remainder
+    rounded_minute = minute - remainder
 
     new_dt = dt_obj.replace(minute=0, second=0, microsecond=0)
     return new_dt + timedelta(minutes=rounded_minute)
 
 def parse_and_round_rtc_time(rtc_str):
-    try:
-        dt_obj = datetime.strptime(rtc_str.strip(), "%d/%m/%Y %H:%M:%S")
-        rounded_dt = round_to_nearest_15_mins(dt_obj)
-        if settings.USE_TZ:
-            return timezone.make_aware(rounded_dt, timezone=IST_TZ)
-        else:
-            return rounded_dt
-        
-    except Exception:
-        current_ist_dt = datetime.now(IST_TZ)
-        naive_dt = current_ist_dt.replace(tzinfo=None)
-        rounded_dt = round_to_nearest_15_mins(naive_dt)
-        
-        if settings.USE_TZ:
-            return timezone.make_aware(rounded_dt, timezone=IST_TZ)
-        else:
-            return rounded_dt
+    # Ignoring TNEB RTC string, using local computer time instead to guarantee 5 runs per block
+    current_ist_dt = datetime.now(IST_TZ)
+    naive_dt = current_ist_dt.replace(tzinfo=None)
+    rounded_dt = round_to_nearest_15_mins(naive_dt)
+    
+    if settings.USE_TZ:
+        return timezone.make_aware(rounded_dt, timezone=IST_TZ)
+    else:
+        return rounded_dt
 
 # ---------------------------------------------------------
 # NEW: STANDALONE LOGIN FUNCTION
@@ -186,10 +174,9 @@ def calculate_15min_averages():
     current_round_off = round_to_nearest_15_mins(naive_current)
 
     if settings.USE_TZ:
-        current_round_off = timezone.make_aware(current_round_off, timezone=IST_TZ)
-        time_threshold = current_round_off - timedelta(minutes=15)
+        time_threshold = timezone.make_aware(current_round_off, timezone=IST_TZ)
     else:
-        time_threshold = current_round_off - timedelta(minutes=15)
+        time_threshold = current_round_off
 
     time_threshold_str = time_threshold.strftime('%Y-%m-%d %I:%M:%S %p')
 
@@ -331,29 +318,32 @@ while True:
             )
 
         if db_instances:
-            # Step 1: Save EVERYTHING to raw table
-            FeederDataRaw.objects.bulk_create(db_instances)
-            print(f"   -> [Status] Stored {len(db_instances)} raw rows to the DB (FeederDataRaw).")
-            
-            # Count the runs to show 1 to 5 progress
             sample_feeder = db_instances[0].feeder_name
             current_target_block = db_instances[0].round_off_time
             
+            # Count the existing runs for this block
             run_count = FeederDataRaw.objects.filter(
                 feeder_name=sample_feeder,
                 round_off_time=current_target_block
             ).count()
             
-            print(f"   -> [Progress] Count of the times running: Run {run_count} of 5.")
-            
-            if run_count < 5:
-                print("   -> [Status] Waiting to show the average data... (Need 5 total runs).")
+            if run_count >= 5:
+                print(f"   -> [Status] Already have 5 runs for block {current_target_block}. Skipping save.")
             else:
-                print("   -> [Status] Totally 5 times run is done! 15 mins slot completed.")
-                print("   -> [Status] Preparing to run the next 15 mins slot for the next 5 times...")
+                # Step 1: Save EVERYTHING to raw table
+                FeederDataRaw.objects.bulk_create(db_instances)
+                run_count += 1
+                print(f"   -> [Status] Stored {len(db_instances)} raw rows to the DB (FeederDataRaw).")
+                print(f"   -> [Progress] Count of the times running: Run {run_count} of 5.")
                 
-                # Step 2: Average completed blocks (SOLAR ONLY, NO CHECK, NO WIND)
-                calculate_15min_averages()
+                if run_count < 5:
+                    print("   -> [Status] Waiting to show the average data... (Need 5 total runs).")
+                else:
+                    print("   -> [Status] Totally 5 times run is done! 15 mins slot completed.")
+                    print("   -> [Status] Preparing to run the next 15 mins slot for the next 5 times...")
+                    
+                    # Step 2: Average completed blocks (SOLAR ONLY, NO CHECK, NO WIND)
+                    calculate_15min_averages()
             
         else:
             print("   -> [Warning] No data extracted in this run. Was the portal completely blank?")
