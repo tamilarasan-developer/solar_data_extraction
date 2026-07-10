@@ -22,14 +22,9 @@ from django.conf import settings
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-LOGIN_URL = "https://mail.tneb.in/tneb4g/"
-DASHBOARD_URL = "https://mail.tneb.in/tneb4g/SSLiveDashboard.aspx?ssid=2387&ddl=-1&pddl=-1&subddl=-1&sddl=-1"
-API_URL = "https://mail.tneb.in/tneb4g/WebService/WS_SSLiveDashboard.asmx/WS_Get_SSLiveInstantDSB"
-
-USERNAME = "ViolaGreen"
-PASSWORD = "Viola@123"
+LOGIN_URL = "https://mail.tneb.in/tneb4g/"DASHBOARD_URL = "https://mail.tneb.in/tneb4g/SSLiveDashboard.aspx?ssid=2387&ddl=-1&pddl=-1&subddl=-1&sddl=-1" API_URL = "https://mail.tneb.in/tneb4g/WebService/WS_SSLiveDashboard.asmx/WS_Get_SSLiveInstantDSB" USERNAME = "ViolaGreen" PASSWORD = "Viola@123"
 SUBSTATION_ID = "2387"
-
+ 
 IST_TZ = ZoneInfo('Asia/Kolkata')
 
 def safe_decimal(val):
@@ -347,6 +342,8 @@ while True:
             
         else:
             print("   -> [Warning] No data extracted in this run. Was the portal completely blank?")
+            print("   -> [Auth Warning] Assuming session expired silently. Forcing fresh login next run.")
+            is_logged_in = False
 
     except Exception as e:
         print("\n❌ ERROR:", e)
